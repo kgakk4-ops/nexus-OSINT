@@ -1,0 +1,1690 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nexus OSINT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#08080a;--panel:#101014;--panel2:#16161c;--panel3:#1c1c24;
+  --border:#1e1e26;--border2:#2a2a36;
+  --text:#f0f0f5;--text2:#9a9aa8;--text3:#5a5a68;
+  --accent:#ff9f43;--accent-light:#ffd8a8;--accent-dark:#cc7a2e;
+  --success:#51cf66;--danger:#ff6b6b;--info:#4dabf7;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5;overflow-x:hidden}
+.mono{font-family:'JetBrains Mono',monospace}
+button,input,textarea,select{font-family:inherit}
+a{color:inherit;text-decoration:none}
+ul,ol{list-style:none}
+.hidden{display:none!important}
+
+/* Background */
+.bg-layers{position:fixed;inset:0;z-index:-1;pointer-events:none}
+.bg-base{position:absolute;inset:0;background:var(--bg)}
+.bg-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.02) 1px,transparent 1px);background-size:64px 64px}
+.bg-glow-tl{position:absolute;top:-200px;left:-200px;width:800px;height:800px;background:radial-gradient(circle,rgba(255,159,67,0.08) 0%,transparent 70%)}
+.bg-glow-br{position:absolute;bottom:-300px;right:-300px;width:900px;height:900px;background:radial-gradient(circle,rgba(255,216,168,0.04) 0%,transparent 70%)}
+.bg-noise{position:absolute;inset:0;opacity:0.015;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+/* Header */
+.header{height:64px;position:sticky;top:0;z-index:100;background:rgba(8,8,10,0.75);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:16px}
+.burger{width:24px;height:24px;display:flex;flex-direction:column;justify-content:center;gap:5px;cursor:pointer;background:none;border:none;padding:0}
+.burger span{display:block;height:2px;background:var(--text2);transition:background 150ms;border-radius:1px}
+.burger:hover span{background:var(--accent)}
+.logo{font-size:1.1rem;font-weight:700;display:flex;align-items:center;gap:8px}
+.logo .n{color:var(--text)}.logo .o{color:var(--accent)}
+.logo-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.nav-tabs{display:none;gap:28px;margin:0 auto}
+.nav-tabs a{font-size:0.9rem;color:var(--text2);padding:20px 0 18px;position:relative;cursor:pointer}
+.nav-tabs a:hover{color:var(--text)}
+.nav-tabs a.active{color:var(--accent)}
+.nav-tabs a.active::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--accent)}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:14px}
+.score-display{font-family:'JetBrains Mono',monospace;font-size:0.85rem;color:var(--text3)}
+.avatar-chip{display:flex;align-items:center;gap:8px;padding:4px 10px 4px 4px;border:1px solid var(--border);border-radius:20px;cursor:pointer;transition:border-color 150ms}
+.avatar-chip:hover{border-color:var(--accent)}
+.avatar-chip .av{width:28px;height:28px;border-radius:50%;background:var(--panel3);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.avatar-chip .av svg{width:18px;height:18px}
+.avatar-chip .nick{font-size:0.85rem;font-weight:500}
+.avatar-chip .arr{color:var(--text3);font-size:0.7rem}
+
+/* Sidebar */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);z-index:200;opacity:0;visibility:hidden;transition:opacity 350ms,visibility 350ms}
+.overlay.open{opacity:1;visibility:visible}
+.sidebar{position:fixed;top:0;left:0;width:320px;height:100vh;z-index:210;background:var(--panel);border-right:1px solid var(--border);transform:translateX(-100%);transition:transform 350ms ease-out;display:flex;flex-direction:column;overflow:hidden}
+.sidebar.open{transform:translateX(0)}
+.sidebar-header{height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sidebar-close{width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--text2);cursor:pointer;font-size:1.2rem}
+.sidebar-close:hover{color:var(--accent)}
+.sidebar-body{flex:1;overflow-y:auto;padding:12px 0}
+.menu-link{display:flex;align-items:center;gap:10px;padding:10px 16px;font-size:0.92rem;color:var(--text2);cursor:pointer;transition:background 150ms,color 150ms}
+.menu-link:hover{background:var(--panel2);color:var(--accent)}
+.menu-link.active{background:var(--panel2);color:var(--accent);border-left:2px solid var(--accent);padding-left:14px}
+.menu-section-title{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 6px;font-size:0.7rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);cursor:pointer;user-select:none}
+.menu-section-title:hover{color:var(--text2)}
+.menu-section-title .arrow{transition:transform 300ms}
+.menu-section-title.collapsed .arrow{transform:rotate(-90deg)}
+.menu-section-content{overflow:hidden;max-height:800px;transition:max-height 300ms ease}
+.menu-section-content.collapsed{max-height:0}
+.chapter-item{display:flex;align-items:center;gap:10px;padding:8px 16px 8px 20px;font-size:0.88rem;color:var(--text2);cursor:pointer;transition:background 150ms,color 150ms}
+.chapter-item:hover{background:var(--panel2);color:var(--accent)}
+.chapter-item .num{font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:0.8rem;min-width:22px}
+.chapter-item .status{margin-left:auto;font-size:0.85rem}
+.chapter-item .status.done{color:var(--success)}
+.chapter-item .status.lock{color:var(--text3)}
+.sidebar-footer{padding:14px 16px;border-top:1px solid var(--border);flex-shrink:0;font-size:0.8rem;color:var(--text3)}
+.sidebar-footer .stat{display:flex;justify-content:space-between;margin-bottom:4px}
+.sidebar-footer .stat span:last-child{font-family:'JetBrains Mono',monospace;color:var(--text2)}
+
+/* Main */
+.main{min-height:calc(100vh - 64px)}
+.page{display:none;padding:32px 24px 60px;max-width:1200px;margin:0 auto}
+.page.active{display:block;animation:fadeIn 200ms ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 18px;border-radius:6px;font-size:0.9rem;font-weight:600;border:none;cursor:pointer;transition:background 150ms,border-color 150ms,color 150ms}
+.btn-accent{background:var(--accent);color:#08080a}
+.btn-accent:hover{background:var(--accent-light)}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border)}
+.btn-ghost:hover{border-color:var(--border2);color:var(--text);background:var(--panel2)}
+.btn-sm{height:32px;padding:0 12px;font-size:0.8rem}
+.btn:disabled{opacity:0.4;cursor:not-allowed}
+
+/* Cards */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:18px;transition:border-color 200ms,background 200ms}
+.card:hover{border-color:var(--border2);background:var(--panel2)}
+.section-title{font-size:1.75rem;font-weight:700;margin-bottom:6px;letter-spacing:-0.02em}
+.section-sub{font-size:0.9rem;color:var(--text2);margin-bottom:24px}
+
+/* Hero */
+.hero{height:360px;display:flex;flex-direction:column;justify-content:center;background:radial-gradient(ellipse at top left,rgba(255,159,67,0.08) 0%,transparent 60%);margin:-32px -24px 40px;padding:0 24px}
+.hero h1{font-size:2.75rem;font-weight:700;letter-spacing:-0.03em;margin-bottom:10px}
+.hero p{font-size:1rem;color:var(--text2);margin-bottom:14px;max-width:480px}
+.hero .meta{font-family:'JetBrains Mono',monospace;font-size:0.85rem;color:var(--text3);margin-bottom:28px}
+
+/* Course */
+.course-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.chapter-card{cursor:pointer}
+.chapter-card .num{font-family:'JetBrains Mono',monospace;font-size:1.4rem;color:var(--accent);font-weight:700;margin-bottom:6px}
+.chapter-card .title{font-size:1rem;font-weight:600;margin-bottom:8px}
+.chapter-card .status{font-size:0.8rem;color:var(--text3);margin-bottom:12px}
+.chapter-card .progress-line{height:2px;background:var(--border);border-radius:1px;overflow:hidden}
+.chapter-card .progress-line span{display:block;height:100%;background:var(--accent);width:0%;transition:width 400ms}
+
+/* Top-10 */
+.top-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.top-card{cursor:pointer}
+.top-card .rank{font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:0.9rem;margin-bottom:4px}
+.top-card .name{font-size:0.95rem;font-weight:600;margin-bottom:4px}
+.top-card .desc{font-size:0.8rem;color:var(--text2);margin-bottom:8px}
+.top-card .score{font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:var(--text3)}
+
+/* Cases */
+.cases-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.case-card{border-left:3px solid var(--accent)}
+.case-card .name{font-size:1rem;font-weight:600;margin-bottom:6px}
+.case-card .desc{font-size:0.85rem;color:var(--text2);margin-bottom:12px}
+.case-card .meta{display:flex;justify-content:space-between;align-items:center}
+.plat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+
+/* Chapter page */
+.breadcrumbs{font-size:0.8rem;color:var(--text3);margin-bottom:12px}
+.chapter-header{font-size:2rem;font-weight:700;margin-bottom:28px;letter-spacing:-0.02em}
+.stages{display:flex;gap:24px;margin-bottom:36px}
+.stage-circle{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:0.9rem;font-weight:600;background:var(--panel);border:1px solid var(--border);color:var(--text3)}
+.stage-circle.active{background:var(--accent);color:#08080a;border-color:var(--accent)}
+.stage-circle.done{background:var(--success);color:#08080a;border-color:var(--success)}
+.stage-label{font-size:0.8rem;color:var(--text3);margin-top:6px;text-align:center}
+.theory-text p{font-size:0.95rem;line-height:1.7;margin-bottom:16px;color:var(--text2)}
+.theory-text strong{color:var(--text);font-weight:600}
+.quiz-q{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:14px}
+.quiz-q .q-num{font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:0.85rem;margin-bottom:8px}
+.quiz-q .q-text{font-size:0.95rem;font-weight:500;margin-bottom:14px}
+.quiz-opt{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:6px;cursor:pointer;transition:background 150ms;margin-bottom:4px}
+.quiz-opt:hover{background:var(--panel2)}
+.quiz-opt input{display:none}
+.quiz-opt .radio{width:18px;height:18px;border-radius:50%;border:2px solid var(--border2);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.quiz-opt input:checked + .radio{border-color:var(--accent);background:var(--accent)}
+.quiz-opt input:checked + .radio::after{content:'✓';color:#08080a;font-size:0.7rem;font-weight:700}
+.quiz-result{margin-top:20px;padding:16px;background:var(--panel);border-radius:10px;border:1px solid var(--border)}
+.case-area textarea{width:100%;min-height:180px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;color:var(--text);font-size:0.9rem;resize:vertical;outline:none;transition:border-color 150ms}
+.case-area textarea:focus{border-color:var(--accent)}
+.case-area textarea::placeholder{color:var(--text3)}
+.nav-bottom{display:flex;justify-content:space-between;margin-top:40px;padding-top:20px;border-top:1px solid var(--border)}
+
+/* Catalog */
+.catalog-controls{display:flex;gap:12px;align-items:center;margin-bottom:28px;flex-wrap:wrap}
+.catalog-controls input[type="search"]{flex:1;min-width:200px;height:40px;background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:0 14px;color:var(--text);font-size:0.9rem;outline:none}
+.catalog-controls input:focus{border-color:var(--accent)}
+.catalog-controls select{height:40px;background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:0 12px;color:var(--text);font-size:0.85rem;outline:none}
+.cat-count{font-family:'JetBrains Mono',monospace;font-size:0.85rem;color:var(--text3)}
+.categories{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+.cat-header{display:flex;align-items:center;gap:10px;margin-bottom:14px;font-size:1.05rem;font-weight:600}
+.cat-header .count{font-size:0.75rem;background:var(--panel3);color:var(--text3);padding:2px 8px;border-radius:10px;font-family:'JetBrains Mono',monospace}
+.tools-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tool-card .name{font-size:1.05rem;font-weight:600;margin-bottom:4px}
+.tool-card .rating{font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:0.85rem;margin-bottom:6px}
+.tool-card .desc{font-size:0.85rem;color:var(--text2);margin-bottom:10px}
+.tool-card .cmd{font-family:'JetBrains Mono',monospace;font-size:0.72rem;background:var(--panel3);padding:4px 8px;border-radius:4px;color:var(--text3);margin-bottom:12px;display:inline-block}
+.tool-card .actions{display:flex;gap:8px}
+
+/* Profile */
+.profile-card{display:flex;gap:24px;align-items:center;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:28px;margin-bottom:28px}
+.profile-av{width:72px;height:72px;border-radius:50%;border:2px solid var(--accent);background:var(--panel3);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.profile-av svg{width:40px;height:40px}
+.profile-info h2{font-size:1.5rem;font-weight:700;margin-bottom:4px}
+.profile-info .id{font-family:'JetBrains Mono',monospace;font-size:0.85rem;color:var(--text3)}
+.badge-author{display:inline-block;font-size:0.7rem;background:var(--accent);color:#08080a;padding:2px 8px;border-radius:4px;font-weight:600;margin-left:8px}
+.metrics{display:flex;gap:32px;margin-bottom:28px}
+.metric{text-align:center}
+.metric .val{font-family:'JetBrains Mono',monospace;font-size:1.5rem;font-weight:700;color:var(--accent)}
+.metric .label{font-size:0.8rem;color:var(--text3)}
+.profile-actions{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:32px}
+.fav-list{display:grid;gap:10px}
+.fav-item{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--panel);border:1px solid var(--border);border-radius:8px}
+
+/* Notes */
+.notes-layout{display:flex;height:calc(100vh - 240px);min-height:400px;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.notes-list{width:240px;background:var(--panel);border-right:1px solid var(--border);overflow-y:auto;flex-shrink:0}
+.note-item{padding:12px 14px;cursor:pointer;border-bottom:1px solid var(--border);transition:background 150ms}
+.note-item:hover{background:var(--panel2)}
+.note-item.active{background:var(--panel2);border-left:2px solid var(--accent);padding-left:12px}
+.note-item .ntitle{font-weight:600;font-size:0.9rem;margin-bottom:2px}
+.note-item .ndate{font-size:0.75rem;color:var(--text3)}
+.notes-editor{flex:1;display:flex;flex-direction:column;background:var(--panel);padding:20px}
+.notes-editor input{background:transparent;border:none;font-size:0.95rem;font-weight:600;color:var(--text);outline:none;margin-bottom:12px;padding:0}
+.notes-editor textarea{flex:1;min-height:320px;background:transparent;border:none;color:var(--text);font-size:0.9rem;line-height:1.6;resize:none;outline:none}
+.notes-meta{font-size:0.75rem;color:var(--text3);margin-top:10px;display:flex;justify-content:space-between}
+.notes-meta .saved{color:var(--success)}
+.notes-toolbar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+
+/* Viz */
+.viz-toolbar{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;align-items:center}
+.viz-toolbar select,.viz-toolbar input{height:36px;background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:0 10px;color:var(--text);font-size:0.85rem;outline:none}
+.viz-toolbar input{min-width:160px}
+.viz-canvas-wrap{height:60vh;background:var(--panel);border:1px solid var(--border);border-radius:10px;position:relative;overflow:hidden;background-image:linear-gradient(rgba(255,159,67,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,159,67,0.04) 1px,transparent 1px);background-size:40px 40px}
+#vizCanvas{width:100%;height:100%;display:block;cursor:crosshair}
+.viz-legend{display:flex;flex-wrap:wrap;gap:16px;margin-top:12px;font-size:0.8rem;color:var(--text2)}
+.viz-legend span{display:flex;align-items:center;gap:6px}
+.viz-legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
+
+/* Auth */
+.auth-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px;transition:opacity 200ms ease,visibility 200ms ease;opacity:1;visibility:visible}
+.auth-overlay.hidden{opacity:0;visibility:hidden;pointer-events:none}
+.auth-modal{background:var(--panel);border:1px solid var(--border);border-radius:12px;width:100%;max-width:420px;padding:32px;max-height:90vh;overflow-y:auto}
+.auth-modal h2{font-size:1.4rem;font-weight:700;margin-bottom:20px;text-align:center}
+.auth-tabs{display:flex;margin-bottom:24px;border-bottom:1px solid var(--border)}
+.auth-tabs button{flex:1;background:none;border:none;padding:12px;color:var(--text3);cursor:pointer;font-size:0.9rem;font-weight:500;border-bottom:2px solid transparent}
+.auth-tabs button.active{color:var(--accent);border-bottom-color:var(--accent)}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:0.8rem;color:var(--text3);margin-bottom:6px}
+.form-group input{width:100%;height:40px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:0 12px;color:var(--text);font-size:0.9rem;outline:none}
+.form-group input:focus{border-color:var(--accent)}
+.avatar-pick{display:grid;grid-template-columns:repeat(8,1fr);gap:8px;margin-top:8px}
+.avatar-pick .av-opt{width:100%;aspect-ratio:1;border-radius:50%;background:var(--panel3);border:2px solid transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:border-color 150ms}
+.avatar-pick .av-opt.selected{border-color:var(--accent)}
+.avatar-pick .av-opt svg{width:22px;height:22px}
+.auth-warn{font-size:0.8rem;color:var(--danger);margin-top:12px;line-height:1.4}
+.auth-check{display:flex;align-items:center;gap:8px;margin:16px 0;font-size:0.85rem;color:var(--text2)}
+.auth-check input{width:16px;height:16px;accent-color:var(--accent)}
+.auth-error{color:var(--danger);font-size:0.85rem;margin-bottom:12px;display:none}
+
+/* Certificate */
+.cert{background:var(--panel);border:1px solid var(--accent);border-radius:12px;padding:40px;text-align:center;max-width:500px;margin:40px auto}
+.cert h2{font-size:1.6rem;margin-bottom:8px}
+.cert .sub{color:var(--text2);margin-bottom:24px}
+.cert .name{font-size:1.3rem;font-weight:700;color:var(--accent);margin-bottom:8px}
+.cert .date{font-family:'JetBrains Mono',monospace;color:var(--text3);font-size:0.9rem}
+
+/* Responsive */
+@media (max-width:1024px){
+  .course-grid{grid-template-columns:repeat(2,1fr)}
+  .top-grid{grid-template-columns:repeat(3,1fr)}
+  .cases-grid,.plat-grid{grid-template-columns:repeat(2,1fr)}
+  .categories{grid-template-columns:1fr}
+  .tools-grid{grid-template-columns:1fr}
+}
+@media (max-width:768px){
+  .nav-tabs{display:none!important}
+  .course-grid,.top-grid,.cases-grid,.plat-grid{grid-template-columns:1fr}
+  .sidebar{width:100vw}
+  .hero{height:auto;padding:40px 24px;margin:-32px -24px 32px}
+  .hero h1{font-size:2rem}
+  .notes-layout{flex-direction:column;height:auto}
+  .notes-list{width:100%;max-height:200px;border-right:none;border-bottom:1px solid var(--border)}
+  .profile-card{flex-direction:column;text-align:center}
+  .metrics{justify-content:center;flex-wrap:wrap}
+}
+@media (min-width:900px){
+  .nav-tabs{display:flex}
+}
+
+/* Utility */
+.mt-16{margin-top:16px}.mt-24{margin-top:24px}
+.mb-24{margin-bottom:24px}.mb-32{margin-bottom:32px}
+</style>
+</head>
+<body>
+
+<!-- Фон -->
+<div class="bg-layers">
+  <div class="bg-base"></div>
+  <div class="bg-grid"></div>
+  <div class="bg-glow-tl"></div>
+  <div class="bg-glow-br"></div>
+  <div class="bg-noise"></div>
+</div>
+
+<!-- ===== AUTH ===== -->
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-modal">
+    <h2>Nexus OSINT</h2>
+    <div class="auth-tabs">
+      <button class="active" data-tab="login">Вход</button>
+      <button data-tab="register">Регистрация</button>
+    </div>
+    <div id="authError" class="auth-error"></div>
+
+    <div id="tab-login">
+      <div class="form-group"><label>Ник</label><input type="text" id="loginNick" autocomplete="username"></div>
+      <div class="form-group"><label>Пароль</label><input type="password" id="loginPass" autocomplete="current-password"></div>
+      <button class="btn btn-accent" style="width:100%" id="btnLogin">Войти</button>
+      <button class="btn btn-ghost" style="width:100%;margin-top:10px" id="btnGuest">Войти как гость</button>
+    </div>
+
+    <div id="tab-register" class="hidden">
+      <div class="form-group"><label>Ник (3–20 символов)</label><input type="text" id="regNick" maxlength="20"></div>
+      <div class="form-group"><label>Пароль (мин. 4)</label><input type="password" id="regPass"></div>
+      <div class="form-group"><label>Повтор пароля</label><input type="password" id="regPass2"></div>
+      <div class="form-group">
+        <label>Аватар</label>
+        <div class="avatar-pick" id="avatarPick"></div>
+      </div>
+      <div class="auth-check"><input type="checkbox" id="regCheck"><label for="regCheck">Я записал пароль</label></div>
+      <p class="auth-warn">Пароль невозможно восстановить. Запишите его надёжно.</p>
+      <button class="btn btn-accent" style="width:100%;margin-top:16px" id="btnRegister">Зарегистрироваться</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== HEADER ===== -->
+<header class="header">
+  <button class="burger" id="burgerBtn" aria-label="Меню">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="logo">
+    <span class="n">Nexus</span> <span class="o">OSINT</span>
+    <span class="logo-dot"></span>
+  </div>
+  <nav class="nav-tabs" id="navTabs">
+    <a data-page="home" class="active">Главная</a>
+    <a data-page="course">Курс</a>
+    <a data-page="catalog">Каталог</a>
+    <a data-page="cases">Кейсы</a>
+  </nav>
+  <div class="header-right">
+    <span class="score-display mono" id="headerScore">0</span>
+    <div class="avatar-chip" id="avatarChip">
+      <div class="av" id="headerAv"></div>
+      <span class="nick" id="headerNick">Гость</span>
+      <span class="arr">▾</span>
+    </div>
+  </div>
+</header>
+
+<!-- ===== SIDEBAR ===== -->
+<div class="overlay" id="overlay"></div>
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <div class="logo"><span class="n">Nexus</span> <span class="o">OSINT</span></div>
+    <button class="sidebar-close" id="sidebarClose">✕</button>
+  </div>
+  <div class="sidebar-body">
+    <div class="menu-link active" data-page="home">Главная</div>
+
+    <div class="menu-section-title" data-section="learn">ОБУЧЕНИЕ <span class="arrow">▾</span></div>
+    <div class="menu-section-content" id="sec-learn"></div>
+
+    <div class="menu-section-title collapsed" data-section="tools">ИНСТРУМЕНТЫ <span class="arrow">▾</span></div>
+    <div class="menu-section-content collapsed" id="sec-tools">
+      <div class="menu-link" data-page="catalog">Каталог</div>
+      <div class="menu-link" data-page="top10">Топ-10</div>
+      <div class="menu-link" data-page="cases">Кейсы</div>
+      <div class="menu-link" data-page="platforms">Площадки</div>
+    </div>
+
+    <div class="menu-section-title collapsed" data-section="data">МОИ ДАННЫЕ <span class="arrow">▾</span></div>
+    <div class="menu-section-content collapsed" id="sec-data">
+      <div class="menu-link" data-page="notes">Заметки</div>
+      <div class="menu-link" data-page="viz">Визуализация</div>
+      <div class="menu-link" data-page="favorites">Избранное</div>
+    </div>
+
+    <div class="menu-link" data-page="profile">Профиль</div>
+
+    <div class="menu-section-title collapsed" data-section="about">О САЙТЕ <span class="arrow">▾</span></div>
+    <div class="menu-section-content collapsed" id="sec-about">
+      <div class="menu-link" data-page="about">О проекте</div>
+      <div class="menu-link" data-page="contacts">Контакты</div>
+    </div>
+  </div>
+  <div class="sidebar-footer">
+    <div class="stat"><span>Пройдено</span><span id="statChapters">0/12</span></div>
+    <div class="stat"><span>Счёт</span><span id="statScore">0</span></div>
+    <div class="stat"><span>Стрик</span><span id="statStreak">0 дн.</span></div>
+  </div>
+</aside>
+
+<!-- ===== MAIN ===== -->
+<main class="main">
+
+  <!-- HOME -->
+  <section class="page active" id="page-home">
+    <div class="hero">
+      <h1>Nexus OSINT</h1>
+      <p>Учебная платформа по открытым источникам. Практические навыки, инструменты и кейсы для исследователей.</p>
+      <div class="meta mono">12 глав · 50 инструментов · 6 кейсов</div>
+      <button class="btn btn-accent" id="startLearning">Начать обучение</button>
+    </div>
+
+    <h2 class="section-title">Курс</h2>
+    <p class="section-sub">12 глав от основ до экзамена</p>
+    <div class="course-grid" id="homeCourse"></div>
+
+    <h2 class="section-title" style="margin-top:48px">Топ-10 инструментов</h2>
+    <p class="section-sub">Самые полезные по оценке сообщества</p>
+    <div class="top-grid" id="homeTop10"></div>
+
+    <h2 class="section-title" style="margin-top:48px">Кейсы</h2>
+    <p class="section-sub">Практические задания с реальными сценариями</p>
+    <div class="cases-grid" id="homeCases"></div>
+
+    <h2 class="section-title" style="margin-top:48px">Площадки</h2>
+    <p class="section-sub">Полезные ресурсы и сервисы</p>
+    <div class="plat-grid" id="homePlatforms"></div>
+  </section>
+
+  <!-- COURSE -->
+  <section class="page" id="page-course">
+    <h2 class="section-title">Курс</h2>
+    <p class="section-sub">Полная программа обучения OSINT</p>
+    <div class="course-grid" id="courseGrid"></div>
+  </section>
+
+  <!-- CHAPTER -->
+  <section class="page" id="page-chapter">
+    <div class="breadcrumbs" id="chBreadcrumbs">Курс / Глава</div>
+    <h1 class="chapter-header" id="chTitle">Глава</h1>
+    <div class="stages" id="chStages">
+      <div><div class="stage-circle" id="st1">1</div><div class="stage-label">Теория</div></div>
+      <div><div class="stage-circle" id="st2">2</div><div class="stage-label">Тест</div></div>
+      <div><div class="stage-circle" id="st3">3</div><div class="stage-label">Кейс</div></div>
+    </div>
+    <div id="chContent"></div>
+    <div class="nav-bottom">
+      <button class="btn btn-ghost" id="chPrev">← Предыдущая</button>
+      <button class="btn btn-ghost" id="chNext">Следующая →</button>
+    </div>
+  </section>
+
+  <!-- EXAM -->
+  <section class="page" id="page-exam">
+    <div class="breadcrumbs">Курс / Глава 12. Экзамен</div>
+    <h1 class="chapter-header">Глава 12. Экзамен</h1>
+    <div id="examContent"></div>
+  </section>
+
+  <!-- CATALOG -->
+  <section class="page" id="page-catalog">
+    <h2 class="section-title">Каталог инструментов</h2>
+    <p class="section-sub">50 проверенных OSINT-инструментов</p>
+    <div class="catalog-controls">
+      <input type="search" id="catSearch" placeholder="Поиск инструмента...">
+      <select id="catFilter">
+        <option value="0">Любой рейтинг</option>
+        <option value="4.5">≥ 4.5</option>
+        <option value="4.0">≥ 4.0</option>
+        <option value="3.5">≥ 3.5</option>
+      </select>
+      <span class="cat-count mono" id="catCount">Показано 50 из 50</span>
+    </div>
+    <div class="categories" id="catalogCats"></div>
+  </section>
+
+  <!-- TOP10 -->
+  <section class="page" id="page-top10">
+    <h2 class="section-title">Топ-10</h2>
+    <p class="section-sub">Лучшие инструменты по рейтингу</p>
+    <div class="top-grid" id="top10Grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))"></div>
+  </section>
+
+  <!-- CASES -->
+  <section class="page" id="page-cases">
+    <h2 class="section-title">Кейсы</h2>
+    <p class="section-sub">Практические сценарии расследований</p>
+    <div class="cases-grid" id="casesGrid"></div>
+  </section>
+
+  <!-- PLATFORMS -->
+  <section class="page" id="page-platforms">
+    <h2 class="section-title">Площадки</h2>
+    <p class="section-sub">Полезные ресурсы</p>
+    <div class="plat-grid" id="platGrid"></div>
+  </section>
+
+  <!-- PROFILE -->
+  <section class="page" id="page-profile">
+    <div class="profile-card">
+      <div class="profile-av" id="profAv"></div>
+      <div class="profile-info">
+        <h2 id="profNick">Гость <span class="badge-author hidden" id="profBadge">автор</span></h2>
+        <div class="id mono" id="profId">@guest · #000</div>
+      </div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><div class="val" id="mChapters">0/12</div><div class="label">Пройдено глав</div></div>
+      <div class="metric"><div class="val" id="mScore">0</div><div class="label">Счёт</div></div>
+      <div class="metric"><div class="val" id="mStreak">0</div><div class="label">Стрик (дней)</div></div>
+    </div>
+    <div class="profile-actions">
+      <button class="btn btn-ghost btn-sm" id="btnChangeAv">Сменить аватар</button>
+      <button class="btn btn-ghost btn-sm" id="btnChangePass">Сменить пароль</button>
+      <button class="btn btn-ghost btn-sm" id="btnExportProf">Экспорт профиля</button>
+      <button class="btn btn-ghost btn-sm" id="btnImportProf">Импорт профиля</button>
+      <button class="btn btn-ghost btn-sm" id="btnLogout">Выйти</button>
+    </div>
+    <h3 style="font-size:1.1rem;margin-bottom:14px">Избранное</h3>
+    <div class="fav-list" id="favList"></div>
+  </section>
+
+  <!-- FAVORITES -->
+  <section class="page" id="page-favorites">
+    <h2 class="section-title">Избранное</h2>
+    <div class="fav-list" id="favList2"></div>
+  </section>
+
+  <!-- NOTES -->
+  <section class="page" id="page-notes">
+    <h2 class="section-title">Заметки</h2>
+    <div class="notes-toolbar">
+      <button class="btn btn-accent btn-sm" id="noteNew">Новая заметка</button>
+      <button class="btn btn-ghost btn-sm" id="noteExportAll">Экспорт всех</button>
+      <button class="btn btn-ghost btn-sm" id="noteExportTxt">Экспорт TXT</button>
+      <button class="btn btn-ghost btn-sm" id="noteDelete">Удалить</button>
+    </div>
+    <div class="notes-layout">
+      <div class="notes-list" id="notesList"></div>
+      <div class="notes-editor">
+        <input type="text" id="noteTitle" placeholder="Заголовок заметки">
+        <textarea id="noteBody" placeholder="Текст заметки..."></textarea>
+        <div class="notes-meta">
+          <span id="noteMeta">—</span>
+          <span class="saved" id="noteSaved"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- VIZ -->
+  <section class="page" id="page-viz">
+    <h2 class="section-title">Визуализация</h2>
+    <p class="section-sub">Граф связей для OSINT-расследований</p>
+    <div class="viz-toolbar">
+      <select id="vizType">
+        <option value="person">Человек</option>
+        <option value="phone">Телефон</option>
+        <option value="email">Email</option>
+        <option value="social">Соцсеть</option>
+        <option value="location">Локация</option>
+        <option value="document">Документ</option>
+        <option value="company">Компания</option>
+      </select>
+      <input type="text" id="vizLabel" placeholder="Метка узла">
+      <button class="btn btn-accent btn-sm" id="vizAddNode">Добавить узел</button>
+      <button class="btn btn-ghost btn-sm" id="vizAddLink">Добавить связь</button>
+    </div>
+    <div class="viz-toolbar">
+      <button class="btn btn-ghost btn-sm" id="vizSave">Сохранить</button>
+      <button class="btn btn-ghost btn-sm" id="vizLoad">Загрузить</button>
+      <button class="btn btn-ghost btn-sm" id="vizExport">Экспорт JSON</button>
+      <button class="btn btn-ghost btn-sm" id="vizImport">Импорт JSON</button>
+      <button class="btn btn-ghost btn-sm" id="vizAuto">Авторасположение</button>
+      <button class="btn btn-ghost btn-sm" id="vizClear">Очистить</button>
+    </div>
+    <div class="viz-canvas-wrap"><canvas id="vizCanvas"></canvas></div>
+    <div class="viz-legend" id="vizLegend"></div>
+  </section>
+
+  <!-- ABOUT -->
+  <section class="page" id="page-about">
+    <h2 class="section-title">О проекте</h2>
+    <p style="color:var(--text2);line-height:1.7;max-width:640px">
+      Nexus OSINT — учебная платформа по методам и инструментам разведки по открытым источникам.
+      Курс построен от базовых принципов до практического экзамена. Все данные хранятся локально в вашем браузере.
+      Проект создан для обучения и не предназначен для незаконной деятельности.
+    </p>
+  </section>
+
+  <!-- CONTACTS -->
+  <section class="page" id="page-contacts">
+    <h2 class="section-title">Контакты</h2>
+    <p style="color:var(--text2);line-height:1.7">По вопросам и предложениям: <span class="mono" style="color:var(--accent)">nexus@osint.local</span></p>
+  </section>
+
+</main>
+<script>
+/* ========== DATA ========== */
+const CHAPTERS = [
+  {id:1, title:"Введение в OSINT", theory:`<p><strong>OSINT</strong> (Open Source Intelligence) — сбор и анализ информации из открытых источников. Это фундамент современной разведки и журналистских расследований.</p>
+<p>Ключевые принципы: легальность, воспроизводимость, документирование источников. Всё, что вы находите, должно быть доступно публично без обхода защиты.</p>
+<p>Основные направления: <strong>SOCMINT</strong> (соцсети), <strong>GEOINT</strong> (геолокация), <strong>IMINT</strong> (изображения), доменная разведка, анализ документов.</p>
+<p>Этика: не используйте навыки для преследования, мошенничества или нарушения закона. Цель платформы — обучение.</p>`,
+   quiz:[
+     {q:"Что означает OSINT?", a:["Open Source Intelligence","Online Security Intelligence","Operational System Intelligence","Open System Integration"], c:0},
+     {q:"Какой принцип важен для OSINT?", a:["Анонимность любой ценой","Легальность источников","Взлом систем","Покупка данных"], c:1},
+     {q:"SOCMINT относится к:", a:["Спутниковым снимкам","Социальным сетям","Серверам","Шифрованию"], c:1},
+     {q:"GEOINT — это:", a:["Геолокационная разведка","Генетическая информация","Глобальный интернет","Групповой анализ"], c:0},
+     {q:"Этический принцип OSINT:", a:["Использовать только для личных целей","Не нарушать закон","Скрывать источники","Игнорировать согласие"], c:1}
+   ],
+   caseTask:"Составьте краткий план расследования по открытым источникам для гипотетического персонажа: укажите 5 шагов и типы источников, которые будете использовать."},
+  {id:2, title:"Поиск в открытых источниках", theory:`<p>Эффективный поиск начинается с правильных запросов. Операторы Google: <strong>site:</strong>, <strong>filetype:</strong>, <strong>intitle:</strong>, <strong>inurl:</strong>, кавычки для точных фраз.</p>
+<p>Специализированные поисковики: Yandex, DuckDuckGo, Baidu. Архивы: Wayback Machine, archive.today.</p>
+<p>Булева логика: AND, OR, NOT. Комбинируйте операторы для точных результатов.</p>
+<p>Важно сохранять запросы и результаты. Используйте скриншоты и экспорт.</p>`,
+   quiz:[
+     {q:"Оператор site: ограничивает поиск:", a:["По типу файла","По домену","По дате","По языку"], c:1},
+     {q:"filetype:pdf находит:", a:["Только сайты","PDF-документы","Изображения","Видео"], c:1},
+     {q:"Wayback Machine — это:", a:["Поисковик","Архив веба","Соцсеть","Карта"], c:1},
+     {q:"Кавычки в поиске означают:", a:["Исключение","Точную фразу","ИЛИ","Синонимы"], c:1},
+     {q:"intitle: ищет в:", a:["URL","Заголовке страницы","Теле","Мета-тегах"], c:1}
+   ],
+   caseTask:"Составьте 5 поисковых запросов с операторами для поиска упоминаний организации «Nexus Research» в PDF-документах на доменах .gov и .edu."},
+  {id:3, title:"GEOINT", theory:`<p><strong>GEOINT</strong> — разведка по геопространственным данным. Источники: спутниковые снимки, карты, EXIF, теги локации в соцсетях.</p>
+<p>Инструменты: Google Earth, Sentinel Hub, Overpass Turbo (OpenStreetMap), What3Words.</p>
+<p>Анализ теней, растительности, инфраструктуры помогает датировать и локализовать снимки.</p>
+<p>Соцсети часто содержат геотеги. Проверяйте согласованность данных.</p>`,
+   quiz:[
+     {q:"GEOINT связан с:", a:["Геопространственными данными","Генетикой","Криптографией","Аудио"], c:0},
+     {q:"EXIF может содержать:", a:["Только имя файла","Координаты съёмки","Пароль","IP-адрес сервера"], c:1},
+     {q:"Overpass Turbo работает с:", a:["Google Maps","OpenStreetMap","Yandex","Bing"], c:1},
+     {q:"Анализ теней помогает:", a:["Определить время съёмки","Найти IP","Взломать аккаунт","Расшифровать файл"], c:0},
+     {q:"What3Words — это:", a:["Шифр","Система адресов из трёх слов","Поисковик","Соцсеть"], c:1}
+   ],
+   caseTask:"Опишите, как бы вы определили примерное местоположение по фотографии с видимым зданием, растительностью и направлением теней. Перечислите шаги."},
+  {id:4, title:"SOCMINT", theory:`<p><strong>SOCMINT</strong> — анализ социальных сетей. Платформы: VK, Telegram, Twitter/X, Instagram, Facebook, LinkedIn.</p>
+<p>Методы: поиск по username, анализ связей, временные линии, кросс-платформенная идентификация.</p>
+<p>Инструменты: Sherlock, Maigret, Social Analyzer, ручной анализ профилей.</p>
+<p>Обращайте внимание на общие друзья, хэштеги, геометки, язык, стиль письма.</p>`,
+   quiz:[
+     {q:"SOCMINT — это анализ:", a:["Серверов","Социальных сетей","Спутников","Кода"], c:1},
+     {q:"Sherlock помогает:", a:["Взламывать","Искать username по платформам","Шифровать","Переводить"], c:1},
+     {q:"Кросс-платформенная идентификация:", a:["Связывает аккаунты одного человека","Удаляет аккаунты","Создаёт ботов","Меняет пароли"], c:0},
+     {q:"Важный сигнал в SOCMINT:", a:["Цвет аватарки","Общие друзья и паттерны","Количество лайков","Длина био"], c:1},
+     {q:"Операционная безопасность цели — это:", a:["Её OPSEC","Её пароль","Её IP","Её браузер"], c:0}
+   ],
+   caseTask:"Составьте чек-лист из 8 пунктов для анализа профиля в социальной сети (что смотреть, в каком порядке)."},
+  {id:5, title:"Анализ изображений", theory:`<p>Изображения — богатый источник. Проверяйте <strong>метаданные EXIF</strong>, выполняйте обратный поиск (Google, Yandex, TinEye).</p>
+<p>Анализируйте объекты, текст (OCR), тени, отражения, сжатие, артефакты монтажа.</p>
+<p>Инструменты: exiftool, FotoForensics, InVID, Amped Authenticate (коммерческий).</p>
+<p>Сравнивайте с архивными снимками местности. Обращайте внимание на одежду, номера, вывески.</p>`,
+   quiz:[
+     {q:"EXIF чаще всего содержит:", a:["Пароль Wi-Fi","Данные камеры и координаты","Историю браузера","Ключи шифрования"], c:1},
+     {q:"Обратный поиск изображений нужен для:", a:["Удаления фото","Поиска источников и дубликатов","Увеличения разрешения","Сжатия"], c:1},
+     {q:"OCR позволяет:", a:["Распознать текст на изображении","Удалить фон","Найти лица","Изменить цвет"], c:0},
+     {q:"FotoForensics анализирует:", a:["Звук","Артефакты сжатия и монтажа","Сеть","Код"], c:1},
+     {q:"Метаданные изображений:", a:["Всегда достоверны","Могут быть удалены или подделаны","Нельзя изменить","Содержат пароль"], c:1}
+   ],
+   caseTask:"Опишите алгоритм проверки подлинности фотографии, найденной в сети (минимум 6 шагов)."},
+  {id:6, title:"Доменная разведка", theory:`<p>Домены раскрывают инфраструктуру. WHOIS, DNS-записи (A, MX, NS, TXT), сертификаты SSL, история доменов.</p>
+<p>Инструменты: whois, dig, SecurityTrails, DNSdumpster, crt.sh, ViewDNS.</p>
+<p>Ищите связанные домены, поддомены, IP-диапазоны, email-адреса администраторов.</p>
+<p>Исторические данные WHOIS часто содержат старые контакты.</p>`,
+   quiz:[
+     {q:"WHOIS показывает:", a:["Содержимое сайта","Данные о регистрации домена","Пароли","Логи сервера"], c:1},
+     {q:"crt.sh используется для:", a:["Поиска сертификатов SSL","Взлома HTTPS","Шифрования","Хостинга"], c:0},
+     {q:"Запись MX отвечает за:", a:["Веб-сервер","Почту","DNS","CDN"], c:1},
+     {q:"Поддомены можно найти через:", a:["Только WHOIS","Перебор, сертификаты, поисковики","Только email","Только соцсети"], c:1},
+     {q:"Исторический WHOIS полезен потому что:", a:["Показывает старые контакты","Ускоряет сайт","Меняет IP","Удаляет данные"], c:0}
+   ],
+   caseTask:"Опишите, какие данные вы соберёте о домене example-corp.com и в каком порядке (минимум 7 источников/шагов)."},
+  {id:7, title:"Метаданные", theory:`<p>Метаданные — данные о данных. В документах: автор, дата создания, ПО, пути, правки.</p>
+<p>Инструменты: exiftool, FOCA, metagoofil, pdfinfo.</p>
+<p>Офисные документы, PDF, изображения, аудио часто содержат чувствительную информацию.</p>
+<p>Очистка метаданных важна для OPSEC исследователя.</p>`,
+   quiz:[
+     {q:"Метаданные документа могут содержать:", a:["Только текст","Автора, даты, пути","Пароль администратора","IP пользователя"], c:1},
+     {q:"exiftool работает с:", a:["Только фото","Многими форматами файлов","Только PDF","Только аудио"], c:1},
+     {q:"FOCA специализируется на:", a:["Соцсетях","Извлечении метаданных из документов","Картах","Шифровании"], c:1},
+     {q:"Для OPSEC исследователя важно:", a:["Оставлять метаданные","Очищать метаданные своих файлов","Публиковать всё","Игнорировать даты"], c:1},
+     {q:"Временные метки помогают:", a:["Только сортировать","Строить хронологию событий","Удалять файлы","Менять автора"], c:1}
+   ],
+   caseTask:"Перечислите 6 типов метаданных, которые стоит проверять в PDF-отчёте, и что они могут раскрыть."},
+  {id:8, title:"Telegram OSINT", theory:`<p>Telegram — популярная платформа для OSINT. Каналы, группы, боты, username, ID пользователей.</p>
+<p>Инструменты: TGScan, Telemetr, боты поиска, веб-версии, экспорт чатов.</p>
+<p>Анализируйте дату создания, связанных ботов, пересылки, геолокацию в сообщениях.</p>
+<p>Username можно менять — фиксируйте ID. Архивы каналов сохраняют историю.</p>`,
+   quiz:[
+     {q:"В Telegram важно фиксировать:", a:["Только username","ID пользователя (он постоянный)","Только аватар","Только био"], c:1},
+     {q:"Telemetr используется для:", a:["Взлома","Аналитики каналов","Шифрования","Звонков"], c:1},
+     {q:"Пересылки сообщений помогают:", a:["Найти первоисточник","Удалить канал","Сменить ID","Заблокировать"], c:0},
+     {q:"Username в Telegram:", a:["Нельзя изменить","Можно менять","Всегда уникален навсегда","Содержит телефон"], c:1},
+     {q:"Экспорт чата даёт:", a:["Только текст","Историю сообщений и медиа","Пароли","Ключи"], c:1}
+   ],
+   caseTask:"Опишите план сбора информации о публичном Telegram-канале: какие данные собрать и какими методами (минимум 6 пунктов)."},
+  {id:9, title:"Документы и реестры", theory:`<p>Государственные и коммерческие реестры: компании, недвижимость, суды, патенты, лицензии.</p>
+<p>Источники зависят от страны: ЕГРЮЛ, Companies House, SEC EDGAR, OpenCorporates.</p>
+<p>Связывайте учредителей, адреса, связанные лица. Ищите бенефициаров.</p>
+<p>Судебные решения, банкротства, лицензии раскрывают историю.</p>`,
+   quiz:[
+     {q:"OpenCorporates — это:", a:["Соцсеть","Агрегатор данных о компаниях","Карта","Поисковик изображений"], c:1},
+     {q:"ЕГРЮЛ относится к:", a:["США","России","ЕС","Китаю"], c:1},
+     {q:"SEC EDGAR содержит:", a:["Отчёты публичных компаний США","Паспорта","Переписки","Фото"], c:0},
+     {q:"Бенефициар — это:", a:["Директор","Конечный владелец выгоды","Бухгалтер","Юрист"], c:1},
+     {q:"Реестры важно проверять на:", a:["Красоту интерфейса","Актуальность данных","Цвет сайта","Рекламу"], c:1}
+   ],
+   caseTask:"Составьте список из 5 типов реестров (любая страна), которые полезны для проверки компании, и что в них искать."},
+  {id:10, title:"Инфраструктура", theory:`<p>IP-адреса, хостинг, CDN, облака, порты, сервисы. Shodan, Censys, ZoomEye — поисковики устройств.</p>
+<p>Анализ заголовков HTTP, технологий (Wappalyzer), связанных IP.</p>
+<p>ASN, диапазоны, история хостинга. Связь инфраструктуры с организацией.</p>
+<p>Не сканируйте без разрешения — это может быть незаконно.</p>`,
+   quiz:[
+     {q:"Shodan — это:", a:["Соцсеть","Поисковик устройств и сервисов","Антивирус","Браузер"], c:1},
+     {q:"ASN связан с:", a:["Автономной системой сети","Аватаром","Паролем","Файлом"], c:0},
+     {q:"Wappalyzer определяет:", a:["Технологии сайта","Владельца","Пароль","IP пользователя"], c:0},
+     {q:"Пассивная разведка означает:", a:["Активное сканирование","Использование только публичных данных","Взлом","DDoS"], c:1},
+     {q:"Сканирование портов без разрешения:", a:["Всегда легально","Может быть незаконным","Обязательно","Безопасно"], c:1}
+   ],
+   caseTask:"Опишите пассивный подход к сбору данных об инфраструктуре сайта (без активного сканирования). Минимум 5 методов."},
+  {id:11, title:"Безопасность исследователя", theory:`<p><strong>OPSEC</strong> исследователя критичен. Разделяйте личности, используйте VPN/прокси, виртуальные машины, отдельные браузеры.</p>
+<p>Не оставляйте следы: отключайте WebRTC, чистите метаданные, не логиньтесь личными аккаунтами.</p>
+<p>Документируйте всё. Работайте по чек-листам. Оценивайте риски.</p>
+<p>Юридические рамки различаются по странам. Консультируйтесь при сомнениях.</p>`,
+   quiz:[
+     {q:"OPSEC означает:", a:["Операционную безопасность","Открытый протокол","Операционную систему","Оптимизацию"], c:0},
+     {q:"WebRTC может раскрыть:", a:["Только браузер","Реальный IP за VPN","Только язык","Историю"], c:1},
+     {q:"Рекомендуется использовать:", a:["Личный аккаунт везде","Разделение личностей и окружений","Один пароль","Публичный Wi-Fi без VPN"], c:1},
+     {q:"Метаданные своих файлов нужно:", a:["Оставлять","Очищать перед публикацией","Публиковать","Игнорировать"], c:1},
+     {q:"При юридических сомнениях:", a:["Игнорировать","Консультироваться со специалистом","Продолжать","Спрашивать в чатах"], c:1}
+   ],
+   caseTask:"Составьте личный чек-лист OPSEC из 8 пунктов для начала OSINT-сессии."},
+  {id:12, title:"Экзамен", theory:"", quiz:[], caseTask:""}
+];
+
+const TOOLS = [
+  {cat:"Агрегаторы", name:"OSINT Framework", rating:4.8, desc:"Карта инструментов OSINT по категориям", cmd:"osintframework.com"},
+  {cat:"Агрегаторы", name:"IntelTechniques", rating:4.7, desc:"Инструменты и методики Майка Баззелла", cmd:"inteltechniques.com"},
+  {cat:"Агрегаторы", name:"Bellingcat Toolkit", rating:4.9, desc:"Набор инструментов от Bellingcat", cmd:"bellingcat.com"},
+  {cat:"Агрегаторы", name:"Awesome OSINT", rating:4.6, desc:"Курируемый список ресурсов на GitHub", cmd:"github.com/jivoi/awesome-osint"},
+  {cat:"Агрегаторы", name:"OSINT Combine", rating:4.5, desc:"Платформа для автоматизации сбора", cmd:"osintcombine.com"},
+  {cat:"Поиск людей", name:"Sherlock", rating:4.8, desc:"Поиск username по сотням платформ", cmd:"sherlock username"},
+  {cat:"Поиск людей", name:"Maigret", rating:4.7, desc:"Глубокий поиск аккаунтов по нику", cmd:"maigret username"},
+  {cat:"Поиск людей", name:"WhatsMyName", rating:4.5, desc:"Проверка username на множестве сайтов", cmd:"whatsmyname.app"},
+  {cat:"Поиск людей", name:"Namechk", rating:4.3, desc:"Быстрая проверка занятости ников", cmd:"namechk.com"},
+  {cat:"Поиск людей", name:"Social Searcher", rating:4.4, desc:"Поиск упоминаний в соцсетях", cmd:"social-searcher.com"},
+  {cat:"Соцсети", name:"Sowdust", rating:4.6, desc:"Продвинутый поиск Facebook", cmd:"sowsearch.info"},
+  {cat:"Соцсети", name:"Twitter Advanced Search", rating:4.7, desc:"Операторы поиска X/Twitter", cmd:"twitter.com/search-advanced"},
+  {cat:"Соцсети", name:"VK Search Tools", rating:4.4, desc:"Расширенный поиск по VK", cmd:"vk.com"},
+  {cat:"Соцсети", name:"Instaloader", rating:4.5, desc:"Скачивание данных Instagram", cmd:"instaloader profile"},
+  {cat:"Соцсети", name:"LinkedIn Dorks", rating:4.3, desc:"Google-дорки для LinkedIn", cmd:"site:linkedin.com"},
+  {cat:"Геолокация", name:"Google Earth Pro", rating:4.9, desc:"Спутниковые снимки и история", cmd:"google.com/earth"},
+  {cat:"Геолокация", name:"Sentinel Hub", rating:4.7, desc:"Спутниковые данные Sentinel", cmd:"sentinel-hub.com"},
+  {cat:"Геолокация", name:"Overpass Turbo", rating:4.6, desc:"Запросы к OpenStreetMap", cmd:"overpass-turbo.eu"},
+  {cat:"Геолокация", name:"SunCalc", rating:4.5, desc:"Положение солнца и теней", cmd:"suncalc.org"},
+  {cat:"Геолокация", name:"What3Words", rating:4.4, desc:"Адреса из трёх слов", cmd:"what3words.com"},
+  {cat:"Метаданные", name:"ExifTool", rating:4.9, desc:"Чтение и запись метаданных", cmd:"exiftool file"},
+  {cat:"Метаданные", name:"FOCA", rating:4.5, desc:"Извлечение метаданных документов", cmd:"github.com/ElevenPaths/FOCA"},
+  {cat:"Метаданные", name:"Metagoofil", rating:4.3, desc:"Сбор документов и метаданных", cmd:"metagoofil -d domain"},
+  {cat:"Метаданные", name:"pdfinfo", rating:4.4, desc:"Информация о PDF", cmd:"pdfinfo file.pdf"},
+  {cat:"Метаданные", name:"Jeffrey's Exif Viewer", rating:4.6, desc:"Онлайн-просмотр EXIF", cmd:"exif.regex.info"},
+  {cat:"Анализ Telegram", name:"TGStat", rating:4.7, desc:"Статистика каналов Telegram", cmd:"tgstat.ru"},
+  {cat:"Анализ Telegram", name:"Telemetr", rating:4.6, desc:"Аналитика Telegram-каналов", cmd:"telemetr.io"},
+  {cat:"Анализ Telegram", name:"TelegramDB", rating:4.4, desc:"Поиск каналов и ботов", cmd:"telegramdb.org"},
+  {cat:"Анализ Telegram", name:"Lyzem", rating:4.3, desc:"Поиск по Telegram", cmd:"lyzem.com"},
+  {cat:"Анализ Telegram", name:"Comment Export Bots", rating:4.2, desc:"Экспорт комментариев", cmd:"@bot"},
+  {cat:"Документы и реестры", name:"OpenCorporates", rating:4.8, desc:"Глобальный реестр компаний", cmd:"opencorporates.com"},
+  {cat:"Документы и реестры", name:"Companies House", rating:4.7, desc:"Реестр компаний UK", cmd:"companieshouse.gov.uk"},
+  {cat:"Документы и реестры", name:"SEC EDGAR", rating:4.6, desc:"Отчёты публичных компаний США", cmd:"sec.gov/edgar"},
+  {cat:"Документы и реестры", name:"Court Records", rating:4.4, desc:"Судебные документы", cmd:"local courts"},
+  {cat:"Документы и реестры", name:"Patent Databases", rating:4.3, desc:"Патентные реестры", cmd:"patents.google.com"},
+  {cat:"Домены и инфраструктура", name:"SecurityTrails", rating:4.8, desc:"История DNS и WHOIS", cmd:"securitytrails.com"},
+  {cat:"Домены и инфраструктура", name:"crt.sh", rating:4.7, desc:"Поиск SSL-сертификатов", cmd:"crt.sh"},
+  {cat:"Домены и инфраструктура", name:"DNSdumpster", rating:4.6, desc:"Разведка DNS и поддоменов", cmd:"dnsdumpster.com"},
+  {cat:"Домены и инфраструктура", name:"Shodan", rating:4.9, desc:"Поиск устройств и сервисов", cmd:"shodan.io"},
+  {cat:"Домены и инфраструктура", name:"ViewDNS", rating:4.5, desc:"Набор DNS-инструментов", cmd:"viewdns.info"},
+  {cat:"Изображения и видео", name:"TinEye", rating:4.7, desc:"Обратный поиск изображений", cmd:"tineye.com"},
+  {cat:"Изображения и видео", name:"Yandex Images", rating:4.8, desc:"Мощный обратный поиск", cmd:"yandex.ru/images"},
+  {cat:"Изображения и видео", name:"InVID", rating:4.6, desc:"Верификация видео", cmd:"www.invid-project.eu"},
+  {cat:"Изображения и видео", name:"FotoForensics", rating:4.5, desc:"Анализ монтажа изображений", cmd:"fotoforensics.com"},
+  {cat:"Изображения и видео", name:"Google Lens", rating:4.4, desc:"Распознавание объектов", cmd:"lens.google.com"},
+  {cat:"Безопасность исследователя", name:"Tor Browser", rating:4.8, desc:"Анонимный браузер", cmd:"torproject.org"},
+  {cat:"Безопасность исследователя", name:"Tails OS", rating:4.7, desc:"Живая система с OPSEC", cmd:"tails.boum.org"},
+  {cat:"Безопасность исследователя", name:"VirtualBox", rating:4.6, desc:"Виртуальные машины", cmd:"virtualbox.org"},
+  {cat:"Безопасность исследователя", name:"uBlock Origin", rating:4.9, desc:"Блокировщик трекеров", cmd:"ublockorigin.com"},
+  {cat:"Безопасность исследователя", name:"NoScript", rating:4.5, desc:"Контроль скриптов", cmd:"noscript.net"}
+];
+
+const CASES = [
+  {id:1, name:"Поиск человека по нику", desc:"Найти все возможные аккаунты и связать личность по username.", rating:4.7},
+  {id:2, name:"Локализация фото", desc:"Определить место съёмки по визуальным признакам и метаданным.", rating:4.8},
+  {id:3, name:"Инфраструктура компании", desc:"Собрать данные о доменах, IP и связанных лицах организации.", rating:4.6},
+  {id:4, name:"Анализ Telegram-канала", desc:"Построить профиль канала: аудитория, источники, связи.", rating:4.5},
+  {id:5, name:"Проверка документа", desc:"Извлечь метаданные и проверить подлинность PDF-отчёта.", rating:4.4},
+  {id:6, name:"Кросс-платформенный след", desc:"Связать аккаунты одной персоны через несколько платформ.", rating:4.9}
+];
+
+const PLATFORMS = [
+  {name:"Bellingcat", desc:"Расследовательский коллектив и методологии", rating:4.9},
+  {name:"IntelTechniques", desc:"Обучение и инструменты Майка Баззелла", rating:4.8},
+  {name:"OSINT Framework", desc:"Структурированная карта инструментов", rating:4.7},
+  {name:"SANS OSINT", desc:"Курсы и ресурсы SANS", rating:4.6},
+  {name:"Trace Labs", desc:"CTF и обучение по поиску пропавших", rating:4.5},
+  {name:"Sector035", desc:"Еженедельный дайджест OSINT", rating:4.4}
+];
+
+const EXAM_STAGES = [
+  {title:"Анализ изображения", task:"Опишите шаги верификации предоставленного изображения: метаданные, обратный поиск, визуальный анализ, возможные выводы."},
+  {title:"Username", task:"Составьте план поиска по username «nexus_ops»: какие инструменты и платформы проверить, что фиксировать."},
+  {title:"Соцсети", task:"Опишите метод кросс-платформенной идентификации профиля и признаки связанности аккаунтов."},
+  {title:"Email", task:"Как проверить email-адрес: утечки, связанные аккаунты, домены, риски. Перечислите инструменты."},
+  {title:"Геолокация", task:"Алгоритм определения местоположения по фото с городским пейзажем без EXIF."},
+  {title:"Верификация", task:"Как отличить достоверный источник от дезинформации: чек-лист из 6 пунктов."},
+  {title:"Отчёт", task:"Структура итогового OSINT-отчёта: разделы, требования к источникам, оформление выводов."}
+];
+
+const AVATAR_SVGS = [
+  '<svg viewBox="0 0 24 24" fill="none" stroke="#ff9f43" stroke-width="1.5"><path d="M12 3l8 4v5c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V7l8-4z"/></svg>',
+  '<svg viewBox="0 0 24 24" fill="none" stroke="#ff9f43" stroke-width="1.5"><circle cx="12" cy="12" r="2"/><circle cx="12" cy="12" r="6" stroke-dasharray="4 2"/><circle cx="12" cy="12" r="10" stroke-dasharray="2 3"/></svg>',
+  '<svg viewBox="0 0 24 24" fill="none" stroke="#ff9f43" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2"/><path d="M12 12l4-4"/></svg>',
+  '<svg viewBox="0 0 24 24" fill="none" stroke="#ff9f43" stroke-width="1.5"><circle cx="12" cy="12" r="2"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2"/><ellipse cx="12" cy="12" rx="8" ry="3"/></svg>',
+  '<svg viewBox="0 0 24 24" fill="none" stroke="#ff9f43" stroke-width="1.5"><path d="M12 11a3 3 0 100-6 3 3 0 000 6z"/><path d="M6 20v-1a4 4 0 014-4h4a4 4 0 014 4v1"/></svg>',
+  '<svg viewBox="0 0 24 24" fill="none" stroke="#ff9f43" stroke-width="1.5"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  '<svg viewBox="0 0 24 24" fill="none" stroke="#ff9f43" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg>',
+  '<svg viewBox="0 0 24 24" fill="none" stroke="#ff9f43" stroke-width="1.5"><path d="M12 20V10M8 14l4-4 4 4"/><path d="M5 8a7 7 0 0114 0"/></svg>',
+  '<svg viewBox="0 0 24 24" fill="none" stroke="#ff9f43" stroke-width="1.5"><path d="M12 4l-2 4h4l-2-4z"/><rect x="8" y="8" width="8" height="4" rx="1"/><path d="M10 12v4M14 12v4"/></svg>',
+  '<svg viewBox="0 0 24 24" fill="none" stroke="#ff9f43" stroke-width="1.5"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>',
+  '<svg viewBox="0 0 24 24" fill="none" stroke="#ff9f43" stroke-width="1.5"><circle cx="12" cy="10" r="5"/><path d="M12 15v6M9 18h6"/></svg>',
+  '<svg viewBox="0 0 24 24" fill="none" stroke="#ff9f43" stroke-width="1.5"><path d="M4 8h4l2-3h4l2 3h4v11H4V8z"/><circle cx="12" cy="13" r="3"/></svg>',
+  '<svg viewBox="0 0 24 24" fill="none" stroke="#ff9f43" stroke-width="1.5"><path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>',
+  '<svg viewBox="0 0 24 24" fill="none" stroke="#ff9f43" stroke-width="1.5"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M8 6h8M6 8v8M18 8v8M8 18h8"/></svg>',
+  '<svg viewBox="0 0 24 24" fill="none" stroke="#ff9f43" stroke-width="1.5"><path d="M8 6l-4 6 4 6M16 6l4 6-4 6M12 4v16"/></svg>',
+  '<svg viewBox="0 0 24 24" fill="none" stroke="#ff9f43" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>'
+];
+
+const VIZ_COLORS = {
+  person:"#ff9f43", phone:"#4dabf7", email:"#51cf66", social:"#cc7a2e",
+  location:"#ff6b6b", document:"#9a9aa8", company:"#ffd8a8"
+};
+
+/* ========== STATE ========== */
+let currentUser = null;
+let currentPage = "home";
+let currentChapter = 1;
+let currentStage = 1;
+let examStage = 0;
+let notes = [];
+let activeNoteId = null;
+let favorites = [];
+let vizNodes = [];
+let vizLinks = [];
+let vizLinkMode = false;
+let vizLinkFrom = null;
+
+/* ========== UTILS ========== */
+async function sha256(str) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
+}
+
+function lsKey(k) {
+  if (!currentUser) return `nx_guest_${k}`;
+  return currentUser.guest ? `nx_guest_${k}` : `nx_${currentUser.nick}_${k}`;
+}
+function loadLS(k, def) {
+  try { const v = localStorage.getItem(lsKey(k)); return v ? JSON.parse(v) : def; } catch { return def; }
+}
+function saveLS(k, v) {
+  if (currentUser && currentUser.guest && (k==="progress"||k==="score")) return;
+  try { localStorage.setItem(lsKey(k), JSON.stringify(v)); } catch {}
+}
+
+function getProgress() { return loadLS("progress", {}); }
+function saveProgress(p) { saveLS("progress", p); }
+function getScore() { return loadLS("score", 0); }
+function addScore(n) {
+  const s = getScore() + n;
+  saveLS("score", s);
+  updateScoreUI();
+  return s;
+}
+function updateScoreUI() {
+  const s = getScore();
+  var a = document.getElementById("headerScore"); if (a) a.textContent = s;
+  var b = document.getElementById("statScore"); if (b) b.textContent = s;
+  var c = document.getElementById("mScore"); if (c) c.textContent = s;
+}
+
+function getStreak() {
+  const data = loadLS("streak", {last:null, count:0});
+  const today = new Date().toDateString();
+  if (data.last === today) return data.count;
+  const yesterday = new Date(Date.now()-86400000).toDateString();
+  data.count = (data.last === yesterday) ? data.count + 1 : 1;
+  data.last = today;
+  saveLS("streak", data);
+  return data.count;
+}
+
+function chaptersDone() {
+  const p = getProgress();
+  let n = 0;
+  for (let i=1;i<=11;i++) if (p[i] && p[i].quiz && p[i].case) n++;
+  if (p[12] && p[12].done) n++;
+  return n;
+}
+
+function isChapterUnlocked(id) {
+  if (id === 1) return true;
+  if (id === 12) {
+    const p = getProgress();
+    for (let i=1;i<=11;i++) if (!(p[i] && p[i].quiz && p[i].case)) return false;
+    return true;
+  }
+  const p = getProgress();
+  return p[id-1] && p[id-1].quiz && p[id-1].case;
+}
+function isChapterDone(id) {
+  const p = getProgress();
+  if (id===12) return p[12] && p[12].done;
+  return p[id] && p[id].quiz && p[id].case;
+}
+
+/* ========== AUTH ========== */
+function getUsers() {
+  try { return JSON.parse(localStorage.getItem("nx_users")||"{}"); } catch { return {}; }
+}
+function saveUsers(u) { localStorage.setItem("nx_users", JSON.stringify(u)); }
+
+async function register(nick, pass, avatar) {
+  const users = getUsers();
+  if (users[nick.toLowerCase()]) return "Ник уже занят";
+  if (nick.length < 3 || nick.length > 20 || !/^[a-zA-Z0-9_-]+$/.test(nick)) return "Ник: 3–20 символов, буквы/цифры/_/-";
+  if (pass.length < 4) return "Пароль минимум 4 символа";
+  const hash = await sha256(nick + ":" + pass);
+  users[nick.toLowerCase()] = {nick, hash, avatar, id: Object.keys(users).length+1};
+  saveUsers(users);
+  return null;
+}
+async function login(nick, pass) {
+  const users = getUsers();
+  const u = users[nick.toLowerCase()];
+  if (!u) return "Пользователь не найден";
+  const hash = await sha256(nick + ":" + pass);
+  if (hash !== u.hash) return "Неверный пароль";
+  return u;
+}
+function hideAuth() {
+  var ov = document.getElementById("authOverlay");
+  if (ov) { ov.classList.add("hidden"); ov.style.display = "none"; }
+  document.body.style.overflow = "";
+}
+function showAuth() {
+  var ov = document.getElementById("authOverlay");
+  if (ov) { ov.classList.remove("hidden"); ov.style.display = "flex"; }
+  document.body.style.overflow = "hidden";
+}
+function setSession(user) {
+  currentUser = user;
+  if (!user.guest) localStorage.setItem("nx_session", JSON.stringify({nick:user.nick}));
+  else localStorage.removeItem("nx_session");
+  applyUser();
+  hideAuth();
+}
+function applyUser() {
+  const nick = currentUser ? currentUser.nick : "Гость";
+  const av = currentUser ? (currentUser.avatar||0) : 0;
+  var a = document.getElementById("headerNick"); if (a) a.textContent = nick;
+  var b = document.getElementById("headerAv"); if (b) b.innerHTML = AVATAR_SVGS[av] || AVATAR_SVGS[0];
+  var c = document.getElementById("profNick"); if (c) c.innerHTML = nick + (nick.toLowerCase()==="peca" ? ' <span class="badge-author">автор</span>' : "");
+  var d = document.getElementById("profId"); if (d) d.textContent = `@${nick} · #${String(currentUser && currentUser.id ? currentUser.id : 0).padStart(3,"0")}`;
+  var e = document.getElementById("profAv"); if (e) e.innerHTML = AVATAR_SVGS[av] || AVATAR_SVGS[0];
+  var f = document.getElementById("profBadge"); if (f) f.classList.toggle("hidden", nick.toLowerCase()!=="peca");
+  updateScoreUI();
+  const st = getStreak();
+  var g = document.getElementById("statStreak"); if (g) g.textContent = st + " дн.";
+  var h = document.getElementById("mStreak"); if (h) h.textContent = st;
+  var i = document.getElementById("statChapters"); if (i) i.textContent = chaptersDone() + "/12";
+  var j = document.getElementById("mChapters"); if (j) j.textContent = chaptersDone() + "/12";
+  favorites = loadLS("favorites", []);
+  notes = loadLS("notes", []);
+  renderSidebarChapters();
+  renderHome();
+  renderFavorites();
+}
+function tryAutoLogin() {
+  try {
+    const s = JSON.parse(localStorage.getItem("nx_session")||"null");
+    if (s && s.nick) {
+      const users = getUsers();
+      const u = users[s.nick.toLowerCase()];
+      if (u) { currentUser = u; applyUser(); hideAuth(); return true; }
+    }
+  } catch {}
+  return false;
+}
+
+/* ========== NAV ========== */
+function showPage(page, extra) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  const el = document.getElementById("page-" + page);
+  if (el) el.classList.add("active");
+  currentPage = page;
+  document.querySelectorAll(".nav-tabs a, .menu-link").forEach(a => {
+    a.classList.toggle("active", a.dataset.page === page);
+  });
+  closeSidebar();
+  if (page === "chapter") renderChapter(extra || currentChapter);
+  if (page === "exam") renderExam();
+  if (page === "catalog") renderCatalog();
+  if (page === "course") renderCourseGrid();
+  if (page === "top10") renderTop10();
+  if (page === "cases") renderCases();
+  if (page === "platforms") renderPlatforms();
+  if (page === "notes") renderNotes();
+  if (page === "viz") initViz();
+  if (page === "profile" || page === "favorites") renderFavorites();
+  if (page === "home") renderHome();
+}
+function openSidebar() {
+  document.getElementById("sidebar").classList.add("open");
+  document.getElementById("overlay").classList.add("open");
+}
+function closeSidebar() {
+  document.getElementById("sidebar").classList.remove("open");
+  document.getElementById("overlay").classList.remove("open");
+}
+
+/* ========== RENDER ========== */
+function renderSidebarChapters() {
+  const cont = document.getElementById("sec-learn");
+  if (!cont) return;
+  cont.innerHTML = CHAPTERS.map(ch => {
+    const done = isChapterDone(ch.id);
+    const unlocked = isChapterUnlocked(ch.id);
+    const status = done ? '<span class="status done">✓</span>' : (unlocked ? '' : '<span class="status lock">🔒</span>');
+    return `<div class="chapter-item" data-ch="${ch.id}"><span class="num">${String(ch.id).padStart(2,"0")}</span><span>${ch.title}</span>${status}</div>`;
+  }).join("");
+  cont.querySelectorAll(".chapter-item").forEach(el => {
+    el.addEventListener("click", () => {
+      const id = +el.dataset.ch;
+      if (!isChapterUnlocked(id)) return alert("Глава заблокирована");
+      if (id === 12) showPage("exam");
+      else showPage("chapter", id);
+    });
+  });
+}
+
+function renderHome() {
+  const cg = document.getElementById("homeCourse");
+  if (!cg) return;
+  cg.innerHTML = CHAPTERS.slice(0,12).map(ch => {
+    const done = isChapterDone(ch.id);
+    const unlocked = isChapterUnlocked(ch.id);
+    const p = getProgress()[ch.id] || {};
+    let prog = 0;
+    if (p.quiz) prog += 50;
+    if (p.case || (ch.id===12 && p.done)) prog += 50;
+    return `<div class="card chapter-card" data-ch="${ch.id}">
+      <div class="num">${String(ch.id).padStart(2,"0")}</div>
+      <div class="title">${ch.title}</div>
+      <div class="status">${done?"Пройдено":(unlocked?"Доступно":"Заблокировано")}</div>
+      <div class="progress-line"><span style="width:${prog}%"></span></div>
+    </div>`;
+  }).join("");
+  cg.querySelectorAll(".chapter-card").forEach(el => {
+    el.addEventListener("click", () => {
+      const id = +el.dataset.ch;
+      if (!isChapterUnlocked(id)) return alert("Глава заблокирована");
+      if (id===12) showPage("exam"); else showPage("chapter", id);
+    });
+  });
+
+  const top = [...TOOLS].sort((a,b)=>b.rating-a.rating).slice(0,10);
+  var ht = document.getElementById("homeTop10");
+  if (ht) ht.innerHTML = top.map((t,i) => `
+    <div class="card top-card">
+      <div class="rank mono">#${i+1}</div>
+      <div class="name">${t.name}</div>
+      <div class="desc">${t.desc}</div>
+      <div class="score mono">${t.rating} →</div>
+    </div>`).join("");
+
+  var hc = document.getElementById("homeCases");
+  if (hc) hc.innerHTML = CASES.map(c => `
+    <div class="card case-card">
+      <div class="name">${c.name}</div>
+      <div class="desc">${c.desc}</div>
+      <div class="meta"><span class="mono" style="color:var(--accent)">${c.rating}</span>
+      <button class="btn btn-ghost btn-sm" onclick="alert('Откройте соответствующую главу курса')">Открыть кейс</button></div>
+    </div>`).join("");
+
+  var hp = document.getElementById("homePlatforms");
+  if (hp) hp.innerHTML = PLATFORMS.map(p => `
+    <div class="card">
+      <div style="font-weight:600;margin-bottom:6px">${p.name}</div>
+      <div style="font-size:0.85rem;color:var(--text2);margin-bottom:12px">${p.desc}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span class="mono" style="color:var(--accent)">${p.rating}</span>
+        <button class="btn btn-ghost btn-sm">Перейти</button>
+      </div>
+    </div>`).join("");
+}
+
+function renderCourseGrid() {
+  var grid = document.getElementById("courseGrid");
+  if (!grid) return;
+  grid.innerHTML = CHAPTERS.slice(0,12).map(ch => {
+    const done = isChapterDone(ch.id);
+    const unlocked = isChapterUnlocked(ch.id);
+    const p = getProgress()[ch.id] || {};
+    let prog = 0;
+    if (p.quiz) prog += 50;
+    if (p.case || (ch.id===12 && p.done)) prog += 50;
+    return `<div class="card chapter-card" data-ch="${ch.id}">
+      <div class="num">${String(ch.id).padStart(2,"0")}</div>
+      <div class="title">${ch.title}</div>
+      <div class="status">${done?"Пройдено":(unlocked?"Доступно":"Заблокировано")}</div>
+      <div class="progress-line"><span style="width:${prog}%"></span></div>
+    </div>`;
+  }).join("");
+  grid.querySelectorAll(".chapter-card").forEach(el => {
+    el.addEventListener("click", () => {
+      const id = +el.dataset.ch;
+      if (!isChapterUnlocked(id)) return alert("Глава заблокирована");
+      if (id===12) showPage("exam"); else showPage("chapter", id);
+    });
+  });
+}
+
+function renderChapter(id) {
+  currentChapter = id;
+  const ch = CHAPTERS[id-1];
+  var bc = document.getElementById("chBreadcrumbs");
+  var t = document.getElementById("chTitle");
+  if (bc) bc.textContent = `Курс / Глава ${String(id).padStart(2,"0")}. ${ch.title}`;
+  if (t) t.textContent = `Глава ${String(id).padStart(2,"0")}. ${ch.title}`;
+  currentStage = 1;
+  updateStages();
+  renderStageContent();
+  var prev = document.getElementById("chPrev");
+  var next = document.getElementById("chNext");
+  if (prev) {
+    prev.onclick = () => { if (id>1) showPage("chapter", id-1); };
+    prev.disabled = id<=1;
+  }
+  if (next) {
+    next.onclick = () => { if (id<11) showPage("chapter", id+1); else if (isChapterUnlocked(12)) showPage("exam"); };
+    next.textContent = id<11 ? `Глава ${String(id+1).padStart(2,"0")} →` : "Экзамен →";
+  }
+}
+
+function updateStages() {
+  const p = getProgress()[currentChapter] || {};
+  [1,2,3].forEach(s => {
+    const el = document.getElementById("st"+s);
+    if (!el) return;
+    el.className = "stage-circle";
+    if (s === 1 && p.quiz) { el.classList.add("done"); el.textContent = "✓"; }
+    else if (s === 2 && p.quiz) { el.classList.add("done"); el.textContent = "✓"; }
+    else if (s === 3 && p.case) { el.classList.add("done"); el.textContent = "✓"; }
+    else if (s === currentStage) { el.classList.add("active"); el.textContent = s; }
+    else { el.textContent = s; }
+  });
+}
+
+function renderStageContent() {
+  const cont = document.getElementById("chContent");
+  if (!cont) return;
+  const ch = CHAPTERS[currentChapter-1];
+  const p = getProgress()[currentChapter] || {};
+  if (currentStage === 1) {
+    cont.innerHTML = `<div class="theory-text">${ch.theory}</div>
+      <button class="btn btn-accent mt-24" id="toQuiz">Перейти к тесту</button>`;
+    var btn = document.getElementById("toQuiz");
+    if (btn) btn.onclick = () => { currentStage=2; updateStages(); renderStageContent(); };
+  } else if (currentStage === 2) {
+    if (p.quiz) {
+      cont.innerHTML = `<div class="quiz-result"><p>Тест уже пройден.</p>
+        <button class="btn btn-accent mt-16" id="toCase">К кейсу</button></div>`;
+      var b2 = document.getElementById("toCase");
+      if (b2) b2.onclick = () => { currentStage=3; updateStages(); renderStageContent(); };
+      return;
+    }
+    let html = ch.quiz.map((q,i) => `
+      <div class="quiz-q" data-qi="${i}">
+        <div class="q-num mono">Вопрос ${i+1}</div>
+        <div class="q-text">${q.q}</div>
+        ${q.a.map((opt,j) => `<label class="quiz-opt"><input type="radio" name="q${i}" value="${j}"><span class="radio"></span>${opt}</label>`).join("")}
+      </div>`).join("");
+    html += `<button class="btn btn-accent mt-16" id="checkQuiz">Проверить</button><div id="quizResult"></div>`;
+    cont.innerHTML = html;
+    var cb = document.getElementById("checkQuiz");
+    if (cb) cb.onclick = () => {
+      let correct = 0;
+      ch.quiz.forEach((q,i) => {
+        const sel = cont.querySelector(`input[name="q${i}"]:checked`);
+        if (sel && +sel.value === q.c) correct++;
+      });
+      const res = document.getElementById("quizResult");
+      if (correct >= 4) {
+        const prog = getProgress();
+        if (!prog[currentChapter]) prog[currentChapter] = {};
+        prog[currentChapter].quiz = true;
+        prog[currentChapter].score = (prog[currentChapter].score||0) + correct*2;
+        saveProgress(prog);
+        addScore(correct*2);
+        res.innerHTML = `<div class="quiz-result"><p>Правильно ${correct} из 5. +${correct*2} очков</p>
+          <button class="btn btn-accent mt-16" id="toCase">К кейсу</button></div>`;
+        var tc = document.getElementById("toCase");
+        if (tc) tc.onclick = () => { currentStage=3; updateStages(); renderStageContent(); };
+        updateStages();
+        renderSidebarChapters();
+      } else {
+        res.innerHTML = `<div class="quiz-result"><p>Правильно ${correct} из 5. Нужно минимум 4.</p>
+          <button class="btn btn-ghost mt-16" id="retryQuiz">Попробовать снова</button></div>`;
+        var rq = document.getElementById("retryQuiz");
+        if (rq) rq.onclick = () => renderStageContent();
+      }
+    };
+  } else {
+    if (p.case) {
+      cont.innerHTML = `<div class="quiz-result"><p>✓ Кейс выполнен. +10 очков.</p>
+        <button class="btn btn-accent mt-16" id="toCourse">К карте курса</button></div>`;
+      var tcn = document.getElementById("toCourse");
+      if (tcn) tcn.onclick = () => showPage("course");
+      return;
+    }
+    cont.innerHTML = `<div class="case-area">
+      <p style="margin-bottom:14px;color:var(--text2)">${ch.caseTask}</p>
+      <textarea id="caseAnswer" placeholder="Ваш ответ..."></textarea>
+      <button class="btn btn-accent mt-16" id="caseSubmit">Отметить выполненным</button>
+    </div>`;
+    var cs = document.getElementById("caseSubmit");
+    if (cs) cs.onclick = () => {
+      const ans = document.getElementById("caseAnswer").value.trim();
+      if (ans.length < 20) return alert("Напишите более развёрнутый ответ (мин. 20 символов)");
+      const prog = getProgress();
+      if (!prog[currentChapter]) prog[currentChapter] = {};
+      prog[currentChapter].case = true;
+      prog[currentChapter].score = (prog[currentChapter].score||0) + 10;
+      prog[currentChapter].answer = ans;
+      saveProgress(prog);
+      addScore(10);
+      updateStages();
+      renderSidebarChapters();
+      applyUser();
+      cont.innerHTML = `<div class="quiz-result"><p>✓ Кейс выполнен. +10 очков</p>
+        <button class="btn btn-accent mt-16" id="toCourse2">К карте курса</button></div>`;
+      var tc2 = document.getElementById("toCourse2");
+      if (tc2) tc2.onclick = () => showPage("course");
+    };
+  }
+}
+
+function renderExam() {
+  var ec = document.getElementById("examContent");
+  if (!ec) return;
+  if (!isChapterUnlocked(12)) {
+    ec.innerHTML = `<p style="color:var(--text2)">Экзамен доступен после прохождения глав 1–11.</p>
+      <button class="btn btn-ghost mt-16" id="backToCourse">К курсу</button>`;
+    var bc = document.getElementById("backToCourse");
+    if (bc) bc.onclick = () => showPage("course");
+    return;
+  }
+  const p = getProgress()[12];
+  if (p && p.done) {
+    ec.innerHTML = `
+      <div class="cert">
+        <h2>Сертификат</h2>
+        <div class="sub">Nexus OSINT · Экзамен пройден</div>
+        <div class="name">${currentUser ? currentUser.nick : "Гость"}</div>
+        <div class="date mono">${p.date || new Date().toLocaleDateString("ru")}</div>
+      </div>`;
+    return;
+  }
+  if (examStage >= EXAM_STAGES.length) {
+    const prog = getProgress();
+    prog[12] = {done:true, date: new Date().toLocaleDateString("ru")};
+    saveProgress(prog);
+    addScore(50);
+    applyUser();
+    renderExam();
+    return;
+  }
+  const st = EXAM_STAGES[examStage];
+  ec.innerHTML = `
+    <p style="color:var(--text3);margin-bottom:8px" class="mono">Этап ${examStage+1} из ${EXAM_STAGES.length}</p>
+    <h3 style="font-size:1.2rem;margin-bottom:12px">${st.title}</h3>
+    <p style="color:var(--text2);margin-bottom:16px">${st.task}</p>
+    <textarea id="examAns" style="width:100%;min-height:160px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;color:var(--text);font-size:0.9rem" placeholder="Ваш ответ..."></textarea>
+    <button class="btn btn-accent mt-16" id="examNext">${examStage < EXAM_STAGES.length-1 ? "Следующий этап" : "Завершить экзамен"}</button>`;
+  var en = document.getElementById("examNext");
+  if (en) en.onclick = () => {
+    const ans = document.getElementById("examAns").value.trim();
+    if (ans.length < 30) return alert("Ответ слишком короткий");
+    examStage++;
+    renderExam();
+  };
+}
+
+function renderCatalog() {
+  var searchEl = document.getElementById("catSearch");
+  var filterEl = document.getElementById("catFilter");
+  if (!searchEl || !filterEl) return;
+  const search = (searchEl.value || "").toLowerCase();
+  const minR = parseFloat(filterEl.value) || 0;
+  const cats = {};
+  TOOLS.forEach(t => {
+    if (search && !t.name.toLowerCase().includes(search) && !t.desc.toLowerCase().includes(search)) return;
+    if (t.rating < minR) return;
+    if (!cats[t.cat]) cats[t.cat] = [];
+    cats[t.cat].push(t);
+  });
+  const total = Object.values(cats).reduce((s,a)=>s+a.length,0);
+  var cnt = document.getElementById("catCount");
+  if (cnt) cnt.textContent = `Показано ${total} из ${TOOLS.length}`;
+  var cc = document.getElementById("catalogCats");
+  if (!cc) return;
+  cc.innerHTML = Object.entries(cats).map(([cat, tools]) => `
+    <div>
+      <div class="cat-header">${cat} <span class="count">${tools.length}</span></div>
+      <div class="tools-grid">
+        ${tools.map(t => `
+          <div class="card tool-card">
+            <div class="name">${t.name}</div>
+            <div class="rating mono">${t.rating}</div>
+            <div class="desc">${t.desc}</div>
+            <div class="cmd">${t.cmd}</div>
+            <div class="actions">
+              <button class="btn btn-ghost btn-sm" data-url="https://${t.cmd.replace(/^https?:\/\//,"")}">Открыть</button>
+              <button class="btn btn-ghost btn-sm fav-btn" data-name="${t.name}">${favorites.includes(t.name)?"★":"☆"}</button>
+            </div>
+          </div>`).join("")}
+      </div>
+    </div>`).join("");
+  cc.querySelectorAll("[data-url]").forEach(btn => {
+    btn.onclick = () => window.open(btn.dataset.url, "_blank");
+  });
+  cc.querySelectorAll(".fav-btn").forEach(btn => {
+    btn.onclick = () => {
+      const n = btn.dataset.name;
+      if (favorites.includes(n)) favorites = favorites.filter(x=>x!==n);
+      else favorites.push(n);
+      saveLS("favorites", favorites);
+      btn.textContent = favorites.includes(n) ? "★" : "☆";
+      renderFavorites();
+    };
+  });
+}
+
+function renderTop10() {
+  var g = document.getElementById("top10Grid");
+  if (!g) return;
+  const top = [...TOOLS].sort((a,b)=>b.rating-a.rating).slice(0,10);
+  g.innerHTML = top.map((t,i) => `
+    <div class="card top-card">
+      <div class="rank mono">#${i+1}</div>
+      <div class="name">${t.name}</div>
+      <div class="desc">${t.desc}</div>
+      <div class="score mono">${t.rating}</div>
+    </div>`).join("");
+}
+
+function renderCases() {
+  var g = document.getElementById("casesGrid");
+  if (!g) return;
+  g.innerHTML = CASES.map(c => `
+    <div class="card case-card">
+      <div class="name">${c.name}</div>
+      <div class="desc">${c.desc}</div>
+      <div class="meta"><span class="mono" style="color:var(--accent)">${c.rating}</span>
+      <button class="btn btn-ghost btn-sm" onclick="alert('Откройте соответствующую главу курса')">Открыть кейс</button></div>
+    </div>`).join("");
+}
+
+function renderPlatforms() {
+  var g = document.getElementById("platGrid");
+  if (!g) return;
+  g.innerHTML = PLATFORMS.map(p => `
+    <div class="card">
+      <div style="font-weight:600;margin-bottom:6px">${p.name}</div>
+      <div style="font-size:0.85rem;color:var(--text2);margin-bottom:12px">${p.desc}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span class="mono" style="color:var(--accent)">${p.rating}</span>
+        <button class="btn btn-ghost btn-sm">Перейти</button>
+      </div>
+    </div>`).join("");
+}
+
+function renderFavorites() {
+  const list = favorites.map(name => {
+    const t = TOOLS.find(x=>x.name===name);
+    if (!t) return "";
+    return `<div class="fav-item"><div><strong>${t.name}</strong> <span class="mono" style="color:var(--accent);margin-left:8px">${t.rating}</span></div>
+      <button class="btn btn-ghost btn-sm" data-name="${name}">Убрать</button></div>`;
+  }).join("") || `<p style="color:var(--text3)">Пока пусто. Добавляйте инструменты из каталога.</p>`;
+  var f1 = document.getElementById("favList"); if (f1) f1.innerHTML = list;
+  var f2 = document.getElementById("favList2"); if (f2) f2.innerHTML = list;
+  document.querySelectorAll("#favList button, #favList2 button").forEach(btn => {
+    btn.onclick = () => {
+      favorites = favorites.filter(x=>x!==btn.dataset.name);
+      saveLS("favorites", favorites);
+      renderFavorites();
+      if (currentPage==="catalog") renderCatalog();
+    };
+  });
+}
+
+/* Notes */
+function renderNotes() {
+  var list = document.getElementById("notesList");
+  if (!list) return;
+  list.innerHTML = notes.map(n => `
+    <div class="note-item ${n.id===activeNoteId?"active":""}" data-id="${n.id}">
+      <div class="ntitle">${n.title || "Без названия"}</div>
+      <div class="ndate">${n.date}</div>
+    </div>`).join("") || `<div style="padding:14px;color:var(--text3);font-size:0.85rem">Нет заметок</div>`;
+  list.querySelectorAll(".note-item").forEach(el => {
+    el.onclick = () => { activeNoteId = el.dataset.id; loadNote(); renderNotes(); };
+  });
+  if (activeNoteId) loadNote();
+  else {
+    var t = document.getElementById("noteTitle"); if (t) t.value = "";
+    var b = document.getElementById("noteBody"); if (b) b.value = "";
+    var m = document.getElementById("noteMeta"); if (m) m.textContent = "—";
+    var s = document.getElementById("noteSaved"); if (s) s.textContent = "";
+  }
+}
+function loadNote() {
+  const n = notes.find(x=>x.id===activeNoteId);
+  if (!n) return;
+  var t = document.getElementById("noteTitle"); if (t) t.value = n.title;
+  var b = document.getElementById("noteBody"); if (b) b.value = n.body;
+  var m = document.getElementById("noteMeta"); if (m) m.textContent = n.date;
+  var s = document.getElementById("noteSaved"); if (s) s.textContent = "Сохранено";
+}
+function saveCurrentNote() {
+  if (!activeNoteId) return;
+  const n = notes.find(x=>x.id===activeNoteId);
+  if (!n) return;
+  var t = document.getElementById("noteTitle");
+  var b = document.getElementById("noteBody");
+  n.title = t ? t.value : "";
+  n.body = b ? b.value : "";
+  n.date = new Date().toLocaleString("ru");
+  saveLS("notes", notes);
+  var s = document.getElementById("noteSaved");
+  if (s) s.textContent = "Сохранено " + new Date().toLocaleTimeString("ru",{hour:"2-digit",minute:"2-digit"});
+  renderNotes();
+}
+
+/* Viz */
+function initViz() {
+  var canvas = document.getElementById("vizCanvas");
+  if (!canvas) return;
+  var wrap = canvas.parentElement;
+  canvas.width = wrap.clientWidth;
+  canvas.height = wrap.clientHeight;
+  const saved = loadLS("viz", null);
+  if (saved) { vizNodes = saved.nodes||[]; vizLinks = saved.links||[]; }
+  drawViz();
+  var legend = document.getElementById("vizLegend");
+  if (legend) legend.innerHTML = Object.entries(VIZ_COLORS).map(([k,c]) => `<span><i style="background:${c}"></i>${k}</span>`).join("");
+}
+function drawViz() {
+  var canvas = document.getElementById("vizCanvas");
+  if (!canvas) return;
+  var ctx = canvas.getContext("2d");
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  vizLinks.forEach(l => {
+    const a = vizNodes.find(n=>n.id===l.from);
+    const b = vizNodes.find(n=>n.id===l.to);
+    if (!a||!b) return;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.strokeStyle = "#2a2a36";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    if (l.label) {
+      const mx = (a.x+b.x)/2, my = (a.y+b.y)/2;
+      ctx.fillStyle = "#5a5a68";
+      ctx.font = "11px Inter";
+      ctx.textAlign = "center";
+      ctx.fillText(l.label, mx, my-6);
+    }
+  });
+  vizNodes.forEach(n => {
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, 28, 0, Math.PI*2);
+    ctx.fillStyle = VIZ_COLORS[n.type] || "#ff9f43";
+    ctx.fill();
+    ctx.fillStyle = "#08080a";
+    ctx.font = "600 11px Inter";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const label = n.label.length > 10 ? n.label.slice(0,9)+"…" : n.label;
+    ctx.fillText(label, n.x, n.y);
+  });
+}
+
+/* ========== EVENTS ========== */
+document.getElementById("burgerBtn").onclick = openSidebar;
+document.getElementById("sidebarClose").onclick = closeSidebar;
+document.getElementById("overlay").onclick = closeSidebar;
+
+document.querySelectorAll(".menu-section-title").forEach(el => {
+  el.onclick = () => {
+    el.classList.toggle("collapsed");
+    var s = document.getElementById("sec-" + el.dataset.section);
+    if (s) s.classList.toggle("collapsed");
+  };
+});
+
+document.querySelectorAll("[data-page]").forEach(el => {
+  el.addEventListener("click", e => {
+    e.preventDefault();
+    const page = el.dataset.page;
+    if (page) showPage(page);
+  });
+});
+
+document.getElementById("startLearning").onclick = () => showPage("chapter", 1);
+document.getElementById("avatarChip").onclick = () => showPage("profile");
+
+// Auth tabs
+document.querySelectorAll(".auth-tabs button").forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll(".auth-tabs button").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    var tl = document.getElementById("tab-login");
+    var tr = document.getElementById("tab-register");
+    if (tl) tl.classList.toggle("hidden", btn.dataset.tab!=="login");
+    if (tr) tr.classList.toggle("hidden", btn.dataset.tab!=="register");
+  };
+});
+
+// Avatar pick
+var pick = document.getElementById("avatarPick");
+if (pick) {
+  pick.innerHTML = AVATAR_SVGS.map((svg,i) => `<div class="av-opt ${i===0?"selected":""}" data-i="${i}">${svg}</div>`).join("");
+}
+var selectedAvatar = 0;
+if (pick) {
+  pick.querySelectorAll(".av-opt").forEach(el => {
+    el.onclick = () => {
+      pick.querySelectorAll(".av-opt").forEach(x=>x.classList.remove("selected"));
+      el.classList.add("selected");
+      selectedAvatar = +el.dataset.i;
+    };
+  });
+}
+
+document.getElementById("btnLogin").onclick = async () => {
+  const nick = document.getElementById("loginNick").value.trim();
+  const pass = document.getElementById("loginPass").value;
+  const err = document.getElementById("authError");
+  const res = await login(nick, pass);
+  if (typeof res === "string") { err.textContent = res; err.style.display="block"; return; }
+  err.style.display="none";
+  setSession(res);
+};
+document.getElementById("btnRegister").onclick = async () => {
+  const nick = document.getElementById("regNick").value.trim();
+  const pass = document.getElementById("regPass").value;
+  const pass2 = document.getElementById("regPass2").value;
+  const err = document.getElementById("authError");
+  if (pass !== pass2) { err.textContent = "Пароли не совпадают"; err.style.display="block"; return; }
+  if (!document.getElementById("regCheck").checked) { err.textContent = "Подтвердите, что записали пароль"; err.style.display="block"; return; }
+  const e = await register(nick, pass, selectedAvatar);
+  if (e) { err.textContent = e; err.style.display="block"; return; }
+  const u = await login(nick, pass);
+  setSession(u);
+};
+document.getElementById("btnGuest").onclick = () => {
+  setSession({nick:"Гость", guest:true, avatar:0, id:0});
+};
+document.getElementById("btnLogout").onclick = () => {
+  currentUser = null;
+  localStorage.removeItem("nx_session");
+  showAuth();
+  var hn = document.getElementById("headerNick"); if (hn) hn.textContent = "Гость";
+  var hs = document.getElementById("headerScore"); if (hs) hs.textContent = "0";
+};
+
+document.getElementById("catSearch").oninput = renderCatalog;
+document.getElementById("catFilter").onchange = renderCatalog;
+
+// Notes
+document.getElementById("noteNew").onclick = () => {
+  const id = "n"+Date.now();
+  notes.unshift({id, title:"Новая заметка", body:"", date: new Date().toLocaleString("ru")});
+  activeNoteId = id;
+  saveLS("notes", notes);
+  renderNotes();
+};
+document.getElementById("noteTitle").oninput = saveCurrentNote;
+document.getElementById("noteBody").oninput = saveCurrentNote;
+document.getElementById("noteDelete").onclick = () => {
+  if (!activeNoteId) return;
+  notes = notes.filter(n=>n.id!==activeNoteId);
+  activeNoteId = notes[0]?.id || null;
+  saveLS("notes", notes);
+  renderNotes();
+};
+document.getElementById("noteExportAll").onclick = () => {
+  const blob = new Blob([JSON.stringify(notes,null,2)], {type:"application/json"});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "nexus-notes.json"; a.click();
+};
+document.getElementById("noteExportTxt").onclick = () => {
+  const n = notes.find(x=>x.id===activeNoteId);
+  if (!n) return;
+  const blob = new Blob([n.title+"\n\n"+n.body], {type:"text/plain"});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = (n.title||"note")+".txt"; a.click();
+};
+
+// Viz
+document.getElementById("vizAddNode").onclick = () => {
+  const label = document.getElementById("vizLabel").value.trim() || "Узел";
+  const type = document.getElementById("vizType").value;
+  const canvas = document.getElementById("vizCanvas");
+  vizNodes.push({id:"n"+Date.now(), label, type, x: 100+Math.random()*(canvas.width-200), y: 80+Math.random()*(canvas.height-160)});
+  document.getElementById("vizLabel").value = "";
+  drawViz();
+};
+document.getElementById("vizAddLink").onclick = () => {
+  vizLinkMode = true;
+  vizLinkFrom = null;
+  alert("Кликните два узла подряд для создания связи");
+};
+document.getElementById("vizCanvas").onclick = (e) => {
+  const rect = e.target.getBoundingClientRect();
+  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  const hit = vizNodes.find(n => Math.hypot(n.x-x, n.y-y) < 30);
+  if (vizLinkMode && hit) {
+    if (!vizLinkFrom) vizLinkFrom = hit.id;
+    else if (vizLinkFrom !== hit.id) {
+      const label = prompt("Подпись связи (необязательно)") || "";
+      vizLinks.push({from:vizLinkFrom, to:hit.id, label});
+      vizLinkMode = false; vizLinkFrom = null;
+      drawViz();
+    }
+  }
+};
+document.getElementById("vizSave").onclick = () => { saveLS("viz", {nodes:vizNodes, links:vizLinks}); alert("Сохранено"); };
+document.getElementById("vizLoad").onclick = () => {
+  const d = loadLS("viz", null);
+  if (d) { vizNodes=d.nodes||[]; vizLinks=d.links||[]; drawViz(); }
+};
+document.getElementById("vizExport").onclick = () => {
+  const blob = new Blob([JSON.stringify({nodes:vizNodes,links:vizLinks},null,2)],{type:"application/json"});
+  const a = document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="nexus-graph.json"; a.click();
+};
+document.getElementById("vizImport").onclick = () => {
+  const inp = document.createElement("input"); inp.type="file"; inp.accept=".json";
+  inp.onchange = async () => {
+    const text = await inp.files[0].text();
+    const d = JSON.parse(text);
+    vizNodes = d.nodes||[]; vizLinks = d.links||[]; drawViz();
+  };
+  inp.click();
+};
+document.getElementById("vizClear").onclick = () => { if(confirm("Очистить граф?")){ vizNodes=[]; vizLinks=[]; drawViz(); } };
+document.getElementById("vizAuto").onclick = () => {
+  const canvas = document.getElementById("vizCanvas");
+  const cx = canvas.width/2, cy = canvas.height/2, r = Math.min(cx,cy)-60;
+  vizNodes.forEach((n,i) => {
+    const a = (i / vizNodes.length) * Math.PI * 2;
+    n.x = cx + Math.cos(a)*r;
+    n.y = cy + Math.sin(a)*r;
+  });
+  drawViz();
+};
+
+document.getElementById("btnExportProf").onclick = () => {
+  const data = {user:currentUser, progress:getProgress(), score:getScore(), favorites, notes};
+  const blob = new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const a = document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="nexus-profile.json"; a.click();
+};
+document.getElementById("btnImportProf").onclick = () => {
+  const inp = document.createElement("input"); inp.type="file"; inp.accept=".json";
+  inp.onchange = async () => {
+    const d = JSON.parse(await inp.files[0].text());
+    if (d.progress) saveProgress(d.progress);
+    if (d.score != null) saveLS("score", d.score);
+    if (d.favorites) { favorites=d.favorites; saveLS("favorites",favorites); }
+    if (d.notes) { notes=d.notes; saveLS("notes",notes); }
+    applyUser();
+    alert("Импортировано");
+  };
+  inp.click();
+};
+
+// Init
+tryAutoLogin();
+renderSidebarChapters();
+if (currentUser) {
+  hideAuth();
+} else {
+  showAuth();
+}
+</script>
+</body>
+</html>
